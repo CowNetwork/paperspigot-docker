@@ -1,0 +1,36 @@
+name: Docker Image
+on:
+  push:
+    tags:
+      - '*'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: docker/setup-buildx-action@v1
+      - name: set tag
+        id: tag
+        run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
+      - id: split
+        run: |
+          TAG=${{ steps.tag.outputs.tag }}
+          VERSION=$(echo "$TAG" | cut -d '-' -f 1)
+          tmp=$(echo "$TAG" | cut -d '-' -f 2)
+          BUILD=$(echo "$tmp" | cut -d '.' -f 1)
+          echo "::set-output name=version::$VERSION"
+          echo "::set-output name=build::$BUILD"
+      - name: docker hub login
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GHCR_TOKEN }}
+      - name: build and push
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          build-args: |
+            version=${{ steps.split.outputs.version }}
+            build=${{ steps.split.outputs.build }}
+          tags: ghcr.io/cownetwork/paperspigot:${{ steps.tag.outputs.tag }}
